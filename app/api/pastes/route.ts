@@ -1,59 +1,41 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
-  const body = await req.json();
-  const { content, ttl_seconds, max_views } = body;
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
 
-  // 1️⃣ Validate content
-  if (!content || typeof content !== "string" || content.trim() === "") {
+  const paste = await prisma.paste.findUnique({
+    where: { id },
+  });
+
+  if (!paste) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (paste.expiresAt && new Date() > paste.expiresAt) {
+    return NextResponse.json({ error: "Expired" }, { status: 404 });
+  }
+
+  if (paste.maxViews && paste.viewCount >= paste.maxViews) {
     return NextResponse.json(
-      { error: "content is required" },
-      { status: 400 }
+      { error: "View limit exceeded" },
+      { status: 404 }
     );
   }
 
-  // 2️⃣ Validate ttl_seconds (optional)
-  if (ttl_seconds !== undefined) {
-    if (!Number.isInteger(ttl_seconds) || ttl_seconds < 1) {
-      return NextResponse.json(
-        { error: "ttl_seconds must be an integer >= 1" },
-        { status: 400 }
-      );
-    }
-  }
-
-  // 3️⃣ Validate max_views (optional)
-  if (max_views !== undefined) {
-    if (!Number.isInteger(max_views) || max_views < 1) {
-      return NextResponse.json(
-        { error: "max_views must be an integer >= 1" },
-        { status: 400 }
-      );
-    }
-  }
-
-  // 4️⃣ Calculate expiry time
-  const expiresAt =
-    ttl_seconds !== undefined
-      ? new Date(Date.now() + ttl_seconds * 1000)
-      : null;
-
-  // 5️⃣ Save to database
-  const paste = await prisma.paste.create({
-    data: {
-      content,
-      expiresAt,
-      maxViews: max_views ?? null,
-    },
+  const updated = await prisma.paste.update({
+    where: { id: paste.id },
+    data: { viewCount: { increment: 1 } },
   });
 
-  // 6️⃣ Generate shareable URL
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
   return NextResponse.json({
-    id: paste.id,
-    url: `${baseUrl}/p/${paste.id}`,
+    content: updated.content,
+    remaining_views: updated.maxViews
+      ? updated.maxViews - updated.viewCount
+      : null,
+    expires_at: updated.expiresAt,
   });
 }

@@ -1,37 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-function getNow(req: Request) {
-  if (process.env.TEST_MODE === "1") {
-    const header = req.headers.get("x-test-now-ms");
-    if (header) {
-      return new Date(Number(header));
-    }
-  }
-  return new Date();
-}
-
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const now = getNow(req);
+  const { id } = params;
 
   const paste = await prisma.paste.findUnique({
-    where: { id: params.id },
+    where: { id },
   });
 
-  // Not found
   if (!paste) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Expired by time
-  if (paste.expiresAt && now > paste.expiresAt) {
+  if (paste.expiresAt && new Date() > paste.expiresAt) {
     return NextResponse.json({ error: "Expired" }, { status: 404 });
   }
 
-  // View limit exceeded
   if (paste.maxViews && paste.viewCount >= paste.maxViews) {
     return NextResponse.json(
       { error: "View limit exceeded" },
@@ -39,7 +26,6 @@ export async function GET(
     );
   }
 
-  // Increment view count
   const updated = await prisma.paste.update({
     where: { id: paste.id },
     data: { viewCount: { increment: 1 } },
