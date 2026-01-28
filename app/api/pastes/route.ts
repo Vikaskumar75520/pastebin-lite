@@ -6,7 +6,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { content, ttl_seconds, max_views } = body;
 
-  // Validate content
   if (!content || typeof content !== "string" || content.trim() === "") {
     return NextResponse.json(
       { error: "content is required" },
@@ -14,7 +13,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Validate ttl_seconds (optional)
   if (ttl_seconds !== undefined) {
     if (!Number.isInteger(ttl_seconds) || ttl_seconds < 1) {
       return NextResponse.json(
@@ -24,7 +22,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Validate max_views (optional)
   if (max_views !== undefined) {
     if (!Number.isInteger(max_views) || max_views < 1) {
       return NextResponse.json(
