@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  // ✅ Next.js 16 requires awaiting params in route handlers
+  const { id } = await context.params;
 
   const paste = await prisma.paste.findUnique({
     where: { id },
@@ -27,7 +29,7 @@ export async function GET(
   }
 
   const updated = await prisma.paste.update({
-    where: { id: paste.id },
+    where: { id },
     data: { viewCount: { increment: 1 } },
   });
 
